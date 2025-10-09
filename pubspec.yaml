@@ -1,12 +1,12 @@
 name: flutter_pack
 description: A Flutter utility package that provides database helpers, model/repository generators, string/date extensions, and shared preferences management to speed up app development.
-version: 1.0.5+1
+version: 1.0.8+1
 homepage: https://github.com/danfordChris/flutter_pack.git
 repository: https://github.com/danfordChris/flutter_pack.git
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.19.0"
+  flutter: ">=3.19.0"  
 
 # Add regular dependencies here.
 dependencies:

@@ -1,5 +1,5 @@
-import 'package:flutter_pack/src/model_manager.dart';
-import 'base_database_manager.dart';
+import 'package:flutter_pack/flutter_pack.dart';
+
 
 abstract class BaseDataRepository<T extends BaseDatabaseModel> {
   final T _model;

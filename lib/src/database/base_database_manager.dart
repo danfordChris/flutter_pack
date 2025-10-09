@@ -1,8 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_pack/src/app_utility/app_utility.dart';
-import 'package:flutter_pack/src/database/database_migrator.dart';
-import 'package:flutter_pack/src/model_manager.dart';
+import 'package:flutter_pack/flutter_pack.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
@@ -30,7 +28,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     _database = await sqflite.openDatabase(
       databasePath,
       onCreate: (db, version) async => await _onCreate(db, version),
-      onUpgrade: (db, oldVersion, newVersion) async => await _onUpgrade(db, oldVersion, newVersion),
+      onUpgrade: (db, oldVersion, newVersion) async =>
+          await _onUpgrade(db, oldVersion, newVersion),
       onOpen: (db) async => await _onOpen(db),
       version: _dbVersion,
     );
@@ -64,7 +63,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
         AppUtility.log("Database file does not exist");
         return;
       }
-      Directory targetDirectoryPath = await StarterStorage.storagePath(suffix: "database", file: _dbName);
+      Directory targetDirectoryPath =
+          await StarterStorage.storagePath(suffix: "database", file: _dbName);
       File copiedDatabase = await databaseFile.copy(targetDirectoryPath.path);
       if (!await copiedDatabase.exists()) {
         AppUtility.log("Database failed to export");
@@ -92,19 +92,22 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     AppUtility.log("[ DATABASE ] - $error");
   }
 
-  Future<List<T>> all<T extends BaseDatabaseModel>(String table, T Function(Map<String, dynamic> map) generator) async {
+  Future<List<T>> all<T extends BaseDatabaseModel>(
+      String table, T Function(Map<String, dynamic> map) generator) async {
     sqflite.Database db = await _instanceDatabase;
     List<Map<String, dynamic>> results = await db.query(table);
     if (results.isEmpty) return [];
     return List.generate(results.length, (index) => generator(results[index]));
   }
 
-  Future<List<Map<String, dynamic>>> rawQuery(String query, [List<Object?>? args]) async {
+  Future<List<Map<String, dynamic>>> rawQuery(String query,
+      [List<Object?>? args]) async {
     sqflite.Database db = await _instanceDatabase;
     return await db.rawQuery(query, args);
   }
 
-  Future<List<T>> fromQuery<T extends BaseDatabaseModel>(String query, T Function(Map<String, dynamic> map) generator) async {
+  Future<List<T>> fromQuery<T extends BaseDatabaseModel>(
+      String query, T Function(Map<String, dynamic> map) generator) async {
     sqflite.Database db = await _instanceDatabase;
     List<Map<String, dynamic>> results = await db.rawQuery(query);
     if (results.isEmpty) return [];
@@ -114,7 +117,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
   Future<T?> save<T extends BaseDatabaseModel>(T model) async {
     return await _transactOrFail((transaction) async {
       try {
-        await transaction.insert(model.tableName, model.toMap, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+        await transaction.insert(model.tableName, model.toMap,
+            conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
         return model;
       } catch (exception) {
         _logError(exception);
@@ -127,7 +131,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     return await _transactOrFail((transaction) async {
       try {
         for (T model in models) {
-          await transaction.insert(model.tableName, model.toMap, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+          await transaction.insert(model.tableName, model.toMap,
+              conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
         }
         return true;
       } catch (exception) {
@@ -142,7 +147,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
       try {
         await transaction.delete(models.first.tableName);
         for (T model in models) {
-          await transaction.insert(model.tableName, model.toMap, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+          await transaction.insert(model.tableName, model.toMap,
+              conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
         }
         return true;
       } catch (exception) {
@@ -152,15 +158,20 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     });
   }
 
-  Future<bool> insertOrUpdateBy<T extends BaseDatabaseModel>(List<T> models, String key) async {
+  Future<bool> insertOrUpdateBy<T extends BaseDatabaseModel>(
+      List<T> models, String key) async {
     return await _transactOrFail((transaction) async {
       try {
         for (T model in models) {
           Map<String, dynamic> data = model.mapWithoutId;
           String targetValue = data[key];
-          List<Map<String, dynamic>> results = await transaction.query(model.tableName, where: "$key = ?", whereArgs: [targetValue]);
+          List<Map<String, dynamic>> results = await transaction.query(
+              model.tableName,
+              where: "$key = ?",
+              whereArgs: [targetValue]);
           if (results.isEmpty) {
-            await transaction.insert(model.tableName, data, conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
+            await transaction.insert(model.tableName, data,
+                conflictAlgorithm: sqflite.ConflictAlgorithm.replace);
           } else {
             await transaction.update(
               model.tableName,
@@ -179,12 +190,14 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     });
   }
 
-  Future<T> _transactOrFail<T>(Future<T> Function(sqflite.Transaction transaction) function) async {
+  Future<T> _transactOrFail<T>(
+      Future<T> Function(sqflite.Transaction transaction) function) async {
     sqflite.Database db = await _instanceDatabase;
     return await db.transaction((txn) async => await function(txn));
   }
 
-  Future<T?> update<T extends BaseDatabaseModel>(T model, String where, List<Object?> values) async {
+  Future<T?> update<T extends BaseDatabaseModel>(
+      T model, String where, List<Object?> values) async {
     return await _transactOrFail((transaction) async {
       try {
         await transaction.update(
@@ -202,10 +215,14 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     });
   }
 
-  Future<bool> updateWhere<T extends BaseDatabaseModel>(String table, Map<String, dynamic> values, String where, List<Object?> args) async {
+  Future<bool> updateWhere<T extends BaseDatabaseModel>(String table,
+      Map<String, dynamic> values, String where, List<Object?> args) async {
     return await _transactOrFail((transaction) async {
       try {
-        await transaction.update(table, values, conflictAlgorithm: sqflite.ConflictAlgorithm.replace, where: where, whereArgs: args);
+        await transaction.update(table, values,
+            conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+            where: where,
+            whereArgs: args);
         return true;
       } catch (exception) {
         _logError(exception);
@@ -214,15 +231,19 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     });
   }
 
-  Future<List<T>> findAllBy<T>(String table, String where, List<Object?> values, T Function(Map<String, dynamic> map) generator) async {
+  Future<List<T>> findAllBy<T>(String table, String where, List<Object?> values,
+      T Function(Map<String, dynamic> map) generator) async {
     sqflite.Database db = await _instanceDatabase;
-    List<Map<String, dynamic>> results = await db.query(table, where: where, whereArgs: values);
+    List<Map<String, dynamic>> results =
+        await db.query(table, where: where, whereArgs: values);
     if (results.isEmpty) return [];
     return List.generate(results.length, (index) => generator(results[index]));
   }
 
-  Future<T?> findBy<T>(String table, String where, List<Object?> values, T Function(Map<String, dynamic> map) generator) async {
-    List<T> results = await findAllBy(table, where, values, (map) => generator(map));
+  Future<T?> findBy<T>(String table, String where, List<Object?> values,
+      T Function(Map<String, dynamic> map) generator) async {
+    List<T> results =
+        await findAllBy(table, where, values, (map) => generator(map));
     if (results.isEmpty) return null;
     return results.first;
   }
@@ -230,7 +251,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
   Future<T?> delete<T extends BaseDatabaseModel>(T model) async {
     return await _transactOrFail((transaction) async {
       try {
-        int? result = await transaction.delete(model.tableName, where: "id = ?", whereArgs: [model.toMap["id"]]);
+        int? result = await transaction.delete(model.tableName,
+            where: "id = ?", whereArgs: [model.toMap["id"]]);
         return result == 1 ? model : null;
       } catch (exception) {
         _logError(exception);
@@ -242,7 +264,8 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
   Future<int?> deleteWhere<V>(String table, String column, V id) async {
     return await _transactOrFail((transaction) async {
       try {
-        return await transaction.delete(table, where: "$column = ?", whereArgs: [id]);
+        return await transaction
+            .delete(table, where: "$column = ?", whereArgs: [id]);
       } catch (exception) {
         _logError(exception);
         return null;
@@ -261,8 +284,10 @@ abstract class BaseDatabaseManager extends BaseDatabaseMigrator {
     });
   }
 
-  Future<T> transact<T>(Future<T> Function(sqflite.Transaction transaction) function) async {
-    return await _transactOrFail((transaction) async => await function(transaction));
+  Future<T> transact<T>(
+      Future<T> Function(sqflite.Transaction transaction) function) async {
+    return await _transactOrFail(
+        (transaction) async => await function(transaction));
   }
 
   Future<bool> get deleteAll async {
@@ -285,12 +310,14 @@ class StarterStorage {
 
   static Future<Directory> storagePath({String? suffix, String? file}) async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    String basePath = "/storage/emulated/0/Documents/flutter_pack/${packageInfo.packageName}";
+    String basePath =
+        "/storage/emulated/0/Documents/flutter_pack/${packageInfo.packageName}";
     Directory directory = Directory(basePath);
     if (!await directory.exists()) await directory.create(recursive: true);
     if (suffix == null && file == null) return directory;
     Directory pathedDirectory = Directory("${directory.path}/$suffix");
-    if (!await pathedDirectory.exists()) await pathedDirectory.create(recursive: true);
+    if (!await pathedDirectory.exists())
+      await pathedDirectory.create(recursive: true);
     if (file == null) return pathedDirectory;
     return Directory("${pathedDirectory.path}/$file");
   }

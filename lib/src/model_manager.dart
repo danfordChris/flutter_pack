@@ -88,7 +88,7 @@ abstract class BaseModel extends ModelMapMixin {
   }
 }
 
-abstract class BaseDatabaseModel extends BaseModel implements ModelDatabaseMapMixin {}
+// abstract class BaseDatabaseModel extends BaseModel implements ModelDatabaseMapMixin {}
 
 abstract class ModelMapMixin {
   Map<String, dynamic> get toMap;
