@@ -10,11 +10,14 @@ enum _ResponseType { _get, _post, _put, _patch, _delete }
 
 abstract class BaseAPIManager {
   /// [onUnauthorized] will be invoked whenever a response with status code 401
-  /// is received. It can be used to refresh tokens, redirect to login, etc.
-  BaseAPIManager(this._baseURL, [this._authorization, this.onUnauthorized]);
+  /// is received. The callback should return `true` if the manager should retry
+  /// the failed request (for example after refreshing an access token).
+  BaseAPIManager(this._baseURL, [this._authorizationProvider, this.onUnauthorized]);
   final String _baseURL;
-  Future<Map<String, String>?>? _authorization;
-  final Future<void> Function()? onUnauthorized;
+
+  // Changed from Future to a function that returns a Future
+  final Future<Map<String, String>?> Function()? _authorizationProvider;
+  final Future<bool> Function()? onUnauthorized;
 
   Uri _uri(String endpoint) {
     return Uri.parse("${_baseURL}${endpoint}");
@@ -81,13 +84,13 @@ abstract class BaseAPIManager {
   }
 
   Future<http.Response> _response(
-    _ResponseType type,
-    String url, {
-    Map<String, String>? headers,
-    Map<String, dynamic>? params,
-    Object? body,
-    Encoding? encoding,
-  }) async {
+      _ResponseType type,
+      String url, {
+        Map<String, String>? headers,
+        Map<String, dynamic>? params,
+        Object? body,
+        Encoding? encoding,
+      }) async {
     AppUtility.log("[*] $type => $_baseURL${_formattedParams(url, params)}");
     Map<String, String>? authHeaders = await _endpointHeaders(headers);
     switch (type) {
@@ -156,7 +159,7 @@ abstract class BaseAPIManager {
     return await _apiResponse(_ResponseType._put, url,
         headers: headers, body: body, encoding: encoding);
   }
-
+ 
   Future<APIResponse<T>> apiDelete<T>(String url,
       {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
     return await _apiResponse(_ResponseType._delete, url,
@@ -170,13 +173,13 @@ abstract class BaseAPIManager {
   }
 
   Future<APIResponse<T>> _apiResponse<T>(
-    _ResponseType type,
-    String url, {
-    Map<String, String>? headers,
-    Map<String, dynamic>? params,
-    Object? body,
-    Encoding? encoding,
-  }) async {
+      _ResponseType type,
+      String url, {
+        Map<String, String>? headers,
+        Map<String, dynamic>? params,
+        Object? body,
+        Encoding? encoding,
+      }) async {
     try {
       http.Response response = await _response(
         type,
@@ -186,10 +189,33 @@ abstract class BaseAPIManager {
         body: body,
         encoding: encoding,
       ).timeout(Duration(minutes: 1));
-      // If the server returns 401 or 403, trigger the optional unauthorized handler.
-      if (response.statusCode == 401 || response.statusCode == 403) {
+      // If the server returns 401, trigger the optional unauthorized handler.
+      if (response.statusCode == 401||response.statusCode == 403 ) {
         try {
-          await onUnauthorized?.call();
+          bool? shouldRetry = await onUnauthorized?.call();
+          if (shouldRetry == true) {
+            // Remove any caller-provided Authorization header so that the
+            // retry will pick up a freshly computed authorization value from
+            // the `_authorizationProvider` function (for example after a token refresh).
+            Map<String, String>? retryHeaders;
+            if (headers == null) {
+              retryHeaders = null;
+            } else {
+              retryHeaders = Map<String, String>.from(headers);
+              retryHeaders
+                  .removeWhere((k, v) => k.toLowerCase() == 'authorization');
+            }
+
+            // Retry the request once after the handler (e.g., token refresh).
+            response = await _response(
+              type,
+              url,
+              headers: retryHeaders,
+              params: params,
+              body: body,
+              encoding: encoding,
+            ).timeout(Duration(minutes: 1));
+          }
         } catch (e) {
           AppUtility.log('[onUnauthorized] handler threw an exception: $e');
         }
@@ -218,8 +244,10 @@ abstract class BaseAPIManager {
       "Content-Type": "application/json",
     };
     if (other != null) defaultHeaders.addAll(other);
-    if (_authorization == null) return defaultHeaders;
-    Map<String, String>? authHeaders = await _authorization;
+
+    // Call the provider function to get fresh authorization headers
+    if (_authorizationProvider == null) return defaultHeaders;
+    Map<String, String>? authHeaders = await _authorizationProvider!();
     if (authHeaders == null) return defaultHeaders;
     defaultHeaders.addAll(authHeaders);
     return defaultHeaders;
