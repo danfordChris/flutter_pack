@@ -15,7 +15,7 @@ class APIManagerGenerator {
     buffer.write("static const String _baseURL = \"<Insert URL Here>/api/v1\";\n\t");
     buffer.write("static const String _releaseURL = \"<Insert URL Here>/api/v1\";\n\t");
     buffer.write("static const String _currentURL = kDebugMode ? _localURL : _releaseURL;\n\n\t");
-    buffer.write("static Future<Map<String, String>?> get _authorization async {\n\t\t");
+    buffer.write("static Future<Map<String, String>?> _authorization() async {\n\t\t");
     buffer.write("Preferences preferences = Preferences.instance;\n\t\t");
     buffer.write("String? token = await preferences.fetch(PrefKeys.apiToken);\n\t\t");
     buffer.write("if (token == null) return null;\n\t\t");
