@@ -1,5 +1,6 @@
-import 'package:flutter_pack/flutter_pack.dart';
+// base_repository.dart
 
+import 'package:flutter_pack/flutter_pack.dart';
 
 abstract class BaseDataRepository<T extends BaseDatabaseModel> {
   final T _model;
@@ -45,7 +46,11 @@ abstract class BaseDataRepository<T extends BaseDatabaseModel> {
   }
 
   Future<T?> update(T model) async {
-    return await _databaseManager.update(model, "id = ?", [model.toMap["id"]],);
+    return await _databaseManager.update(
+      model,
+      "id = ?",
+      [model.toMap["id"]],
+    );
   }
 
   Future<T?> updateWhere(T model, String where, List<Object?> args) async {

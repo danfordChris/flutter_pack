@@ -4,24 +4,31 @@ import 'package:flutter_pack/flutter_pack.dart';
 import 'package:http/http.dart';
 
 class APIResponse<T> {
-  APIResponse._(this._response, this._error, this._hasDataKey);
   final Response? _response;
   final String? _error;
   final bool _hasDataKey;
   final List<String> _expectedBodyErrors = [];
   List<String> get expectedBodyErrors => _expectedBodyErrors;
 
-  factory APIResponse.of(Response response) {
+  PaginationMixin? _paginationMixin;
+
+  APIResponse._(this._response, this._error, this._hasDataKey, [this._paginationMixin]);
+
+  factory APIResponse.of(Response response, PaginationMixin? paginationMixin) {
     dynamic data = jsonDecode(response.body);
     bool hasDataKey = data is Map<String, dynamic> && data.containsKey("data");
     List<int> successStatuses = List.generate(100, (index) => 200 + index);
     if (!successStatuses.contains(response.statusCode)) {
       AppUtility.log("[${response.statusCode}] ${response.request?.url.path ?? "-"} => ${response.body}");
       bool hasMessage = data is Map<String, dynamic> && data.containsKey("message");
-      String message = hasMessage ? data["message"] : null;
+      String? message = hasMessage ? data["message"] : null;
       return APIResponse._(response, message, hasDataKey);
     }
-    return APIResponse._(response, null, hasDataKey);
+    bool hasPagination = data is Map<String, dynamic> && data.containsKey("pagination");
+    if (!hasPagination) return APIResponse._(response, null, hasDataKey);
+    Map<String, dynamic>? paginationBody = data["pagination"];
+    if (paginationBody == null) return APIResponse._(response, null, hasDataKey);
+    return APIResponse._(response, null, hasDataKey, paginationMixin);
   }
 
   void expect(Map<String, Type> expectation) {
@@ -68,8 +75,9 @@ class APIResponse<T> {
     throw Exception(message);
   }
 
-  void raiseOnError() {
+  void raiseOnError({void Function()? action}) {
     if (isSuccessful) return;
+    action?.call();
     showError((status) => message);
   }
 
