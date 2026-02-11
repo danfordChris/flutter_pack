@@ -42,7 +42,6 @@ class StarterAPIManagement {
   final List<String>? allowedSHAFingerprints;
   final String? privateKeyPEM;
   final String? publicKeyPEM;
-  final PaginationMixin? paginationMixin;
 
   /// Map of status codes to their respective handler functions
   /// Example: {403: () async => print('Forbidden'), 429: () async => handleRateLimit()}
@@ -54,7 +53,6 @@ class StarterAPIManagement {
     this.authorization,
     this.refreshOnUnauthorized,
     this.allowedSHAFingerprints,
-    this.paginationMixin,
     this.privateKeyPEM,
     this.publicKeyPEM,
     this.statusCodeActions,
@@ -297,7 +295,7 @@ abstract class BaseAPIManager {
       //   }
       // }
 
-      return APIResponse.of(response, _starterAPIManagement?.paginationMixin);
+      return APIResponse.of(response);
     } on SocketException catch (exception) {
       AppUtility.log("[Socket] $url => $exception");
       throw Exception("No Internet Connection Found");

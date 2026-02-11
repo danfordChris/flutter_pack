@@ -42,23 +42,23 @@ class CodeGenerator {
   }
 
   void _addFileMeta(_FileMeta fileMeta) {
-    this._files ??= [];
-    this._files?.add(fileMeta);
+    _files ??= [];
+    _files?.add(fileMeta);
   }
 
   void _addModelGenerator(BaseModelGenerator generator) {
-    this._files ??= [];
-    this._files?.add(_FileMeta._generator(generator));
+    _files ??= [];
+    _files?.add(_FileMeta._generator(generator));
   }
 
   void _addProjectModelGenerator(ProjectModelGenerator generator) {
-    this._files ??= [];
-    this._files?.add(_FileMeta._project(generator));
+    _files ??= [];
+    _files?.add(_FileMeta._project(generator));
   }
 
   void _addRepositories(RepositoryGenerator generator) {
-    this._files ??= [];
-    this._files?.add(_FileMeta._repository(generator));
+    _files ??= [];
+    _files?.add(_FileMeta._repository(generator));
   }
 
   void _addDAOs(DAOGenerator generator) {

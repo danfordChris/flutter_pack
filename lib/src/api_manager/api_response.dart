@@ -10,11 +10,15 @@ class APIResponse<T> {
   final List<String> _expectedBodyErrors = [];
   List<String> get expectedBodyErrors => _expectedBodyErrors;
 
-  PaginationMixin? _paginationMixin;
+  // PaginationMixin? _paginationMixin;
 
-  APIResponse._(this._response, this._error, this._hasDataKey, [this._paginationMixin]);
+  APIResponse._(
+    this._response,
+    this._error,
+    this._hasDataKey,
+  );
 
-  factory APIResponse.of(Response response, PaginationMixin? paginationMixin) {
+  factory APIResponse.of(Response response) {
     dynamic data = jsonDecode(response.body);
     bool hasDataKey = data is Map<String, dynamic> && data.containsKey("data");
     List<int> successStatuses = List.generate(100, (index) => 200 + index);
@@ -28,13 +32,13 @@ class APIResponse<T> {
     if (!hasPagination) return APIResponse._(response, null, hasDataKey);
     Map<String, dynamic>? paginationBody = data["pagination"];
     if (paginationBody == null) return APIResponse._(response, null, hasDataKey);
-    return APIResponse._(response, null, hasDataKey, paginationMixin);
+    return APIResponse._(response, null, hasDataKey);
   }
 
   void expect(Map<String, Type> expectation) {
     if (_response == null) throw Exception("Response is NULL");
     if (!isSuccessful) throw Exception("Response was not successful");
-    dynamic responseBody = jsonDecode(_response!.body);
+    dynamic responseBody = jsonDecode(_response.body);
     if (responseBody == null) throw Exception("Response body is null");
     _expectedBodyErrors.clear();
     if (responseBody is Map<String, dynamic>) {
@@ -70,7 +74,7 @@ class APIResponse<T> {
     if (_response == null) throw Exception("Response is NULL");
     String? serverMessage = this.message;
     if (serverMessage != null) throw Exception(serverMessage);
-    String? message = function(_response!.statusCode);
+    String? message = function(_response.statusCode);
     if (message == null) throw Exception("No message has been found");
     throw Exception(message);
   }
@@ -83,23 +87,23 @@ class APIResponse<T> {
 
   void log() {
     if (_response == null) return;
-    AppUtility.log("${_response!.statusCode} => ${_response!.body}");
+    AppUtility.log("${_response.statusCode} => ${_response.body}");
   }
 
   int get statusCode {
     if (_response == null) throw Exception("Response is NULL");
-    return _response!.statusCode;
+    return _response.statusCode;
   }
 
   Map<String, String> get headers {
     if (_response == null) throw Exception("Response is NULL");
-    return _response!.headers;
+    return _response.headers;
   }
 
   bool get isSuccessful {
-    if (_response == null || (_error != null && _error!.isNotEmpty)) return false;
+    if (_response == null || (_error != null && _error.isNotEmpty)) return false;
     List<int> statuses = List.generate(99, (index) => 200 + index);
-    return statuses.contains(_response!.statusCode);
+    return statuses.contains(_response.statusCode);
   }
 
   String? get message {
@@ -116,13 +120,13 @@ class APIResponse<T> {
 
   dynamic get responseBody {
     if (_response == null) throw Exception("Response is NULL");
-    return jsonDecode(_response!.body);
+    return jsonDecode(_response.body);
   }
 
   T transform(T Function(Map<String, dynamic> map) generator) {
     try {
       if (_response == null) throw Exception("Response is NULL");
-      Map<String, dynamic>? responseData = jsonDecode(_response!.body);
+      Map<String, dynamic>? responseData = jsonDecode(_response.body);
       if (responseData == null) throw Exception("Response data is NULL");
       if (!_hasDataKey) return generator(responseData);
       return generator(responseData["data"]);
@@ -135,7 +139,7 @@ class APIResponse<T> {
   List<T> transformMany(T Function(Map<String, dynamic> map) generator) {
     try {
       if (_response == null) throw Exception("Response is NULL");
-      dynamic responseData = jsonDecode(_response!.body);
+      dynamic responseData = jsonDecode(_response.body);
       if (responseData == null) throw Exception("Response data is NULL");
       if (!_hasDataKey) {
         List<dynamic>? listData = responseData as List<dynamic>?;
