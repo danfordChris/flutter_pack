@@ -7,3 +7,6 @@
     - include database_manager_package_server that provides server for database manager functionality for ROS
     - include database_manager_package_tools that provides tools for database manager functionality for ROS 
  
+## 1.1.0
+- Initial release
+- added security feature on api

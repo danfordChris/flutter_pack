@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_pack/flutter_pack.dart';
 import 'package:flutter_pack/src/api_manager/api_response.dart';
 import 'package:flutter_pack/src/app_utility/starter_scroll_controller.dart';
+import 'package:flutter_pack/src/security/signature_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_certificate_pinning/http_certificate_pinning.dart';
 
@@ -36,23 +37,40 @@ mixin PaginationMixin {
 }
 
 class StarterAPIManagement {
-  final Future<Map<String, String>?> Function()? authorization;
-  final Future<bool> Function()? refreshOnUnauthorized;
+  final Future<Map<String, String>?>? authorization;
+  final Future<bool>? refreshOnUnauthorized;
   final List<String>? allowedSHAFingerprints;
+  final String? privateKeyPEM;
+  final String? publicKeyPEM;
   final PaginationMixin? paginationMixin;
+
+  /// Map of status codes to their respective handler functions
+  /// Example: {403: () async => print('Forbidden'), 429: () async => handleRateLimit()}
+  final Map<int, Future<void> Function()>? statusCodeActions;
+
+  late final DigitalSignature digitalSignature;
 
   StarterAPIManagement({
     this.authorization,
     this.refreshOnUnauthorized,
     this.allowedSHAFingerprints,
     this.paginationMixin,
-  });
+    this.privateKeyPEM,
+    this.publicKeyPEM,
+    this.statusCodeActions,
+  }) {
+    digitalSignature = DigitalSignature(
+      privateKeyPEM: privateKeyPEM,
+      publicKeyPEM: publicKeyPEM,
+    );
+  }
 }
 
 abstract class BaseAPIManager {
-  /// [refreshOnUnauthorized] will be invoked whenever a response with status code 401 0r 403
-  /// is received. The callback should return `true` if the manager should retry
-  /// the failed request (for example after refreshing an access token).
+  bool get isUsingDigitalSignature {
+    return _starterAPIManagement?.privateKeyPEM != null && _starterAPIManagement?.publicKeyPEM != null;
+  }
+
   BaseAPIManager(this._baseURL, [this._starterAPIManagement]) {
     _client = _createClient();
   }
@@ -67,7 +85,7 @@ abstract class BaseAPIManager {
   }
 
   Uri _uri(String endpoint) {
-    return Uri.parse("${_baseURL}${endpoint}");
+    return Uri.parse("$_baseURL$endpoint");
   }
 
   Future<http.Response> get(String url, {Map<String, String>? headers, Map<String, dynamic>? params}) async {
@@ -120,17 +138,31 @@ abstract class BaseAPIManager {
   }) async {
     AppUtility.log("[*] ${type.label} => $_baseURL${_formattedParams(url, params)}");
     Map<String, String>? authHeaders = await _endpointHeaders(headers);
+    Object? requestBody;
+    if (isUsingDigitalSignature) {
+      // Encode the signed body as JSON string
+      if (body == null) {
+        body = <String, dynamic>{};
+      }
+      requestBody = json.encode(await _signedBody(body));
+    } else {
+      if (body is Map<String, dynamic>) {
+        requestBody = json.encode(body);
+      } else {
+        requestBody = body;
+      }
+    }
     switch (type) {
       case _ResponseType._get:
         return await _client.get(_uri(_formattedParams(url, params)), headers: authHeaders);
       case _ResponseType._post:
-        return await _client.post(_uri(url), headers: authHeaders, body: body, encoding: encoding);
+        return await _client.post(_uri(url), headers: authHeaders, body: requestBody, encoding: encoding);
       case _ResponseType._put:
-        return await _client.put(_uri(url), headers: authHeaders, body: body, encoding: encoding);
+        return await _client.put(_uri(url), headers: authHeaders, body: requestBody, encoding: encoding);
       case _ResponseType._patch:
-        return await _client.patch(_uri(url), headers: authHeaders, body: body, encoding: encoding);
+        return await _client.patch(_uri(url), headers: authHeaders, body: requestBody, encoding: encoding);
       case _ResponseType._delete:
-        return await _client.delete(_uri(url), headers: authHeaders, body: body, encoding: encoding);
+        return await _client.delete(_uri(url), headers: authHeaders, body: requestBody, encoding: encoding);
     }
   }
 
@@ -174,6 +206,19 @@ abstract class BaseAPIManager {
     return await _apiResponse(_ResponseType._delete, url, headers: headers, body: body, encoding: encoding);
   }
 
+  /// Execute status code action if defined for the given status code
+  Future<void> _executeStatusCodeAction(int statusCode) async {
+    final action = _starterAPIManagement?.statusCodeActions?[statusCode];
+    if (action != null) {
+      try {
+        AppUtility.log('[StatusCodeAction] Executing action for status code: $statusCode');
+        await action();
+      } catch (e) {
+        AppUtility.log('[StatusCodeAction] Error executing action for status code $statusCode: $e');
+      }
+    }
+  }
+
   Future<APIResponse<T>> _apiResponse<T>(
     _ResponseType type,
     String url, {
@@ -190,11 +235,15 @@ abstract class BaseAPIManager {
         params: params,
         body: body,
         encoding: encoding,
-      ).timeout(Duration(minutes: 1));
+      ).timeout(const Duration(minutes: 1));
+
+      // Execute status code action if defined
+      await _executeStatusCodeAction(response.statusCode);
+
       // If the server returns 401, trigger the optional unauthorized handler.
-      if (response.statusCode == 401 || response.statusCode == 403 /*&& _starterAPIManagement?.refreshOnUnauthorized != null*/) {
+      if (response.statusCode == 401 && _starterAPIManagement?.refreshOnUnauthorized != null) {
         try {
-          bool? shouldRetry = await _starterAPIManagement?.refreshOnUnauthorized?.call();
+          bool? shouldRetry = await _starterAPIManagement?.refreshOnUnauthorized;
           if (shouldRetry == true) {
             // Retry the request once after the handler (e.g., token refresh).
             response = await _response(
@@ -204,12 +253,50 @@ abstract class BaseAPIManager {
               params: params,
               body: body,
               encoding: encoding,
-            ).timeout(Duration(minutes: 1));
+            ).timeout(const Duration(minutes: 1));
+
+            // Execute status code action again for the retry response
+            await _executeStatusCodeAction(response.statusCode);
           }
         } catch (e) {
           AppUtility.log('[refreshOnUnauthorized] handler threw an exception: $e');
         }
       }
+
+      // Validate JSON content type before decoding
+      final contentType = response.headers['content-type'];
+      if (contentType == null || !contentType.toLowerCase().contains('application/json')) {
+        AppUtility.log("[Format] $url => Unexpected content-type: $contentType");
+        throw Exception("The server did not return a JSON response (content-type: $contentType)");
+      }
+      Map<String, dynamic> responseBody = json.decode(response.body);
+      // If backend explicitly returns an error message, surface it immediately
+      if (responseBody.containsKey('error') && responseBody['error'] != null) {
+        final error = responseBody['error'];
+        String errorMessage = _errorHandling(error);
+
+        AppUtility.log("[API Error] $url => $errorMessage");
+        throw Exception(errorMessage);
+      }
+
+      /*
+      No need to check for signature if response is an error, as the error message from the server should be trusted and surfaced regardless of signature validity.
+       This also prevents potential infinite loops of invalid signature errors when the server returns an error response that isn't signed or has an invalid signature.
+      */
+      // if (isUsingDigitalSignature) {
+      //   if (!responseBody.containsKey('signature')) {
+      //     throw Exception("Invalid signature response format: missing 'signature' field");
+      //   }
+      //   if (!responseBody.containsKey('data')) {
+      //     throw Exception("Invalid signature response format: missing 'data' field");
+      //   }
+      //   bool isSignatureValid = _starterAPIManagement!.digitalSignature.verify(canonicalStringify(responseBody["data"]), responseBody['signature']);
+      //   if (!isSignatureValid) {
+      //     AppUtility.log("[Signature] $url => Invalid Signature");
+      //     throw Exception("Invalid server response signature. The response may have been tampered");
+      //   }
+      // }
+
       return APIResponse.of(response, _starterAPIManagement?.paginationMixin);
     } on SocketException catch (exception) {
       AppUtility.log("[Socket] $url => $exception");
@@ -222,7 +309,8 @@ abstract class BaseAPIManager {
       throw Exception("The server returned an unexpected format");
     } catch (exception) {
       AppUtility.log("[Exception] $url => $exception");
-      throw Exception("An error occurred, please contact the developer for assistance");
+      // throw Exception("An error occurred, please contact the developer for assistance");
+      rethrow;
     }
   }
 
@@ -232,7 +320,7 @@ abstract class BaseAPIManager {
     };
     if (other != null) defaultHeaders.addAll(other);
     if (_starterAPIManagement?.authorization == null) return defaultHeaders;
-    Map<String, String>? authHeaders = await _starterAPIManagement?.authorization?.call();
+    Map<String, String>? authHeaders = await _starterAPIManagement?.authorization;
     if (authHeaders == null) return defaultHeaders;
     defaultHeaders.addAll(authHeaders);
     return defaultHeaders;
@@ -248,11 +336,88 @@ abstract class BaseAPIManager {
     return "${questionedParam}${addedParams.join("&")}";
   }
 
-  // static Future<Map<String, String>> instanceAuthorizationHeader() async {
-  //   final headers = await _authorization();
-  //   return {
-  //     'Content-Type': 'multipart/form-data',
-  //     if (headers != null) ...headers,
-  //   };
-  // }
+  Future<Map<String, dynamic>> _signedBody(Object? body) async {
+    // Ensure body is a Map
+    if (body is! Map<String, dynamic>) {
+      if (body is String) {
+        body = json.decode(body) as Map<String, dynamic>;
+      } else {
+        AppUtility.log("Invalid body type for signing: ${body}");
+        throw ArgumentError('Body must be a Map or JSON string');
+      }
+    }
+
+    // Use canonical stringify instead of json.encode
+    final canonical = canonicalStringify(body);
+
+    // Generate signature
+    final signature = _starterAPIManagement!.digitalSignature.sign(canonical);
+
+    return {"data": body, "signature": signature};
+  }
+
+  String canonicalStringify(dynamic obj) {
+    if (obj == null) return "null";
+
+    if (obj is bool || obj is int) return obj.toString();
+
+    if (obj is double) {
+      // Match jsonEncode behavior exactly
+      if (obj % 1 == 0) {
+        return obj.toInt().toString(); // 10.0 => "10"
+      }
+      return obj.toString(); // 12.1 => "12.1"
+    }
+
+    if (obj is String) return '"${_escapeString(obj)}"';
+
+    if (obj is DateTime) return '"${obj.toUtc().toIso8601String()}"';
+
+    if (obj is List) {
+      final items = obj.map((e) => canonicalStringify(e)).join(',');
+      return '[$items]';
+    }
+
+    if (obj is Map) {
+      final sortedKeys = obj.keys.map((e) => e.toString()).toList()..sort();
+
+      final entries = sortedKeys.map((key) {
+        final value = canonicalStringify(obj[key]);
+        return '"$key":$value';
+      }).join(',');
+
+      return '{$entries}';
+    }
+
+    throw ArgumentError("Unsupported type: ${obj.runtimeType}");
+  }
+
+  /// Safe JSON string escape
+  String _escapeString(String value) {
+    return value.replaceAll(r'\', r'\\').replaceAll('"', r'\"').replaceAll('\n', r'\n').replaceAll('\r', r'\r').replaceAll('\t', r'\t');
+  }
+
+  String _errorHandling(dynamic error) {
+    if (error == null) return '';
+
+    if (error is String) {
+      return error;
+    }
+
+    if (error is Map) {
+      final messages = <String>[];
+      error.forEach((_, value) {
+        if (value is List) {
+          for (final item in value) {
+            messages.add(item.toString());
+          }
+        } else {
+          messages.add(value.toString());
+        }
+      });
+      return messages.join('\n');
+    }
+
+    return error.toString();
+  }
 }

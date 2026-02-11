@@ -23,4 +23,4 @@ Add this to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flutter_pack: ^1.0.0+1
+  flutter_pack: ^1.1.0

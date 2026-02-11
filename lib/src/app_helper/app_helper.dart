@@ -1,6 +1,5 @@
+import 'package:flutter_pack/flutter_pack.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import '../app_utility/app_utility.dart';
 
 class AppHelper {
   AppHelper._();

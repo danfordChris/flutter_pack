@@ -81,7 +81,7 @@ extension TimeAgo on Object {
     } else if (diff.inMinutes < 60) {
       return '${diff.inMinutes}m ago';
     } else if (diff.inHours < 24) {
-      return '${diff.inHours}h ago';
+      return '${diff.inHours}hr ago';
     } else if (diff.inDays < 7) {
       return '${diff.inDays}d ago';
     } else if (diff.inDays < 30) {
