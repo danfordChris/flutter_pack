@@ -20,10 +20,10 @@ class SignatureConfig {
     final top = asn1.nextObject() as ASN1Sequence;
 
     if (top.elements.length == 9) {
-      final modulus = (top.elements[1] as ASN1Integer).valueAsBigInteger!;
-      final privateExponent = (top.elements[3] as ASN1Integer).valueAsBigInteger!;
-      final p = (top.elements[4] as ASN1Integer).valueAsBigInteger!;
-      final q = (top.elements[5] as ASN1Integer).valueAsBigInteger!;
+      final modulus = (top.elements[1] as ASN1Integer).valueAsBigInteger;
+      final privateExponent = (top.elements[3] as ASN1Integer).valueAsBigInteger;
+      final p = (top.elements[4] as ASN1Integer).valueAsBigInteger;
+      final q = (top.elements[5] as ASN1Integer).valueAsBigInteger;
       return RSAPrivateKey(modulus, privateExponent, p, q);
     }
 
@@ -38,18 +38,18 @@ class SignatureConfig {
 
       final seq = ASN1Parser(cleaned).nextObject() as ASN1Sequence;
 
-      final modulus = (seq.elements[0] as ASN1Integer).valueAsBigInteger!;
-      final exponent = (seq.elements[1] as ASN1Integer).valueAsBigInteger!;
+      final modulus = (seq.elements[0] as ASN1Integer).valueAsBigInteger;
+      final exponent = (seq.elements[1] as ASN1Integer).valueAsBigInteger;
 
       return RSAPublicKey(modulus, exponent);
     }
 
     if (top.elements.length == 3 && top.elements[2] is ASN1OctetString) {
       final inner = ASN1Parser((top.elements[2] as ASN1OctetString).valueBytes()).nextObject() as ASN1Sequence;
-      final modulus = (inner.elements[1] as ASN1Integer).valueAsBigInteger!;
-      final privateExponent = (inner.elements[3] as ASN1Integer).valueAsBigInteger!;
-      final p = (inner.elements[4] as ASN1Integer).valueAsBigInteger!;
-      final q = (inner.elements[5] as ASN1Integer).valueAsBigInteger!;
+      final modulus = (inner.elements[1] as ASN1Integer).valueAsBigInteger;
+      final privateExponent = (inner.elements[3] as ASN1Integer).valueAsBigInteger;
+      final p = (inner.elements[4] as ASN1Integer).valueAsBigInteger;
+      final q = (inner.elements[5] as ASN1Integer).valueAsBigInteger;
       return RSAPrivateKey(modulus, privateExponent, p, q);
     }
 
@@ -92,7 +92,7 @@ class DigitalSignature {
   bool verify(String data, String signature) {
     if (_publicKey == null) throw StateException("Cannot verify signature: Public key not configured");
     final verifier = Signer("SHA-256/RSA");
-    verifier.init(false, PublicKeyParameter<RSAPublicKey>(_publicKey!));
+    verifier.init(false, PublicKeyParameter<RSAPublicKey>(_publicKey));
     return verifier.verifySignature(
       Uint8List.fromList(utf8.encode(data)),
       RSASignature(base64Decode(signature)),
