@@ -3,6 +3,7 @@
 /// More dartdocs go here.
 library;
 
+export 'src/api_manager/api_response.dart';
 export 'src/api_manager/base_api_manager.dart';
 export 'src/app_helper/app_helper.dart';
 export 'src/app_utility/api_response.dart';
@@ -20,3 +21,4 @@ export 'src/generators/base_repository_generator.dart';
 export 'src/generators/code_generator.dart';
 export 'src/generators/project_model_generator.dart';
 export 'src/preferences/base_preference.dart';
+export 'src/services/base_notification_service.dart';
