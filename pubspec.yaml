@@ -30,6 +30,9 @@ dependencies:
   crypto: ^3.0.7
   pointycastle: ^4.0.0
   asn1lib: ^1.1.0
+  timezone: ^0.10.1
+  flutter_local_notifications: ^20.1.0
+  flutter_dotenv: ^6.0.0
 
 
 dev_dependencies:

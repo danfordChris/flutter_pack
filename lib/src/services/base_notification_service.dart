@@ -4,13 +4,11 @@ import 'package:flutter_pack/flutter_pack.dart';
 import 'package:timezone/data/latest_all.dart' as timezone;
 import 'package:timezone/timezone.dart' as tz_methods;
 
-/// Cross-platform notification bootstrapper with scheduling helpers.
 abstract class BaseNotificationService {
   BaseNotificationService(this._appIcon);
   final String _appIcon;
   static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  /// Initialize platform channels and request permissions where applicable.
   void init() async {
     AndroidFlutterLocalNotificationsPlugin? plugin =
         _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -21,13 +19,12 @@ abstract class BaseNotificationService {
       requestSoundPermission: true,
       requestBadgePermission: true,
       requestAlertPermission: true,
+      // onDidReceiveLocalNotification: _didReceiveNotification,
+      notificationCategories: <DarwinNotificationCategory>[],
     );
     final InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
     bool? initialized = await _flutterLocalNotificationsPlugin.initialize(
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        _didReceiveNotificationResponse(response);
-      },
       settings: initializationSettings,
     );
     if (initialized == null && !initialized!) AppUtility.log("Notification Service Not Initialized!");
@@ -37,11 +34,6 @@ abstract class BaseNotificationService {
     AppUtility.log(payload);
   }
 
-  void _didReceiveNotificationResponse(NotificationResponse response) {
-    AppUtility.log(response.payload);
-  }
-
-  /// Handle notification tap; must be implemented by concrete service.
   void selectNotification(BuildContext context, NotificationResponse response);
 
   NotificationDetails _notificationDetails(int id) {
@@ -51,9 +43,13 @@ abstract class BaseNotificationService {
     return NotificationDetails(android: androidNotificationDetails, iOS: iOSNotificationDetails);
   }
 
-  /// Show an immediate notification with title/body.
-  void showNotification(int id, String title, String subtitle) async {
-    NotificationDetails platformNotificationDetails = _notificationDetails(id);
+  void showNotification({
+    required int id,
+    required String title,
+    required String subtitle,
+    NotificationDetails? notificationDetails,
+  }) async {
+    NotificationDetails platformNotificationDetails = notificationDetails ?? _notificationDetails(id);
     await _flutterLocalNotificationsPlugin.show(
       id: id,
       title: title,
@@ -62,7 +58,6 @@ abstract class BaseNotificationService {
     );
   }
 
-  /// Schedule a notification at a specific time (TZ aware).
   void setupScheduled(
       {required int id,
       String? title,
@@ -78,9 +73,7 @@ abstract class BaseNotificationService {
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       id: id,
       title: title,
-      body: body,
-      scheduledDate: tzDateTime,
-      notificationDetails: platformNotificationDetails,
+      body: body, scheduledDate: tzDateTime, notificationDetails: platformNotificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       // uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,

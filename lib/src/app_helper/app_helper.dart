@@ -21,9 +21,24 @@ class AppHelper {
     }
   }
 
-  static Future<void> openWhatsApp(String phoneNumber) async {
+  static Future<void> openWhatsApp({required  String phoneNumber,  String? message}) async {
     final whatsappUrl = 'https://wa.me/$phoneNumber';
-    await openUrl(whatsappUrl);
+    if (message==null)return  await openUrl(whatsappUrl);
+    await openUrl('$whatsappUrl?text=$message');
+
+  }
+  static Future<void> openEmail({required String email, String? message}) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: message == null ? null : {'body': message},
+    );
+  
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      AppUtility.log("Cannot launch email client for: $email");
+    }
   }
 
   static Future<void> makePhoneCall(String phoneNumber) async {
